@@ -1,10 +1,10 @@
+#youtube_api.py
 import os
 import requests
 import time
-import streamlit as st
+import logging
 from datetime import datetime
 from dotenv import load_dotenv
-import logging
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -79,7 +79,7 @@ def fetch_comments(video_id, max_results=100, page_token=None):
                 try:
                     date_obj = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
                     formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
-                except ValueError:
+                except (ValueError, AttributeError):
                     formatted_date = date_str
                     logger.warning(f"Could not parse date: {date_str}")
                 
@@ -128,94 +128,6 @@ def fetch_comments(video_id, max_results=100, page_token=None):
     except Exception as e:
         logger.error(f"Error fetching comments: {e}")
         raise ValueError(f"Error accessing YouTube API: {str(e)}")
-
-def fetch_all_comments(video_id, max_results=None):
-    """
-    Fetch all comments from a YouTube video with pagination
-    
-    Args:
-        video_id (str): YouTube video ID
-        max_results (int, optional): Maximum number of comments to fetch. If None, fetches all.
-        
-    Returns:
-        list: List of comment dictionaries
-    """
-    # Initialize empty list for all comments
-    all_comments = []
-    
-    # Track pagination
-    next_page_token = None
-    page_num = 1
-    
-    # Set up Streamlit progress indicators
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    status_text.text(f"Starting to fetch comments...")
-    
-    try:
-        # Loop until we have all comments or reach max_results
-        while True:
-            # Update status
-            status_text.text(f"Fetching page {page_num} of comments...")
-            
-            # Fetch a page of comments (100 is max per page)
-            result = fetch_comments(
-                video_id=video_id,
-                max_results=100,
-                page_token=next_page_token
-            )
-            
-            # Get comments and metadata from result
-            page_comments = result["comments"]
-            metadata = result.get("metadata", {})
-            
-            # Check if we got any comments
-            if not page_comments or len(page_comments) == 0:
-                logger.info(f"No comments found on page {page_num}")
-                break
-                
-            # Add this page's comments to our total
-            all_comments.extend(page_comments)
-            
-            # Update progress
-            status_text.text(f"Retrieved {len(all_comments)} comments so far...")
-            
-            # Show progress
-            progress_value = min(0.95, page_num * 0.1)  # Never quite reaches 100% until done
-            progress_bar.progress(progress_value)
-            
-            # Check if we need to stop based on max_results
-            if max_results is not None and len(all_comments) >= max_results:
-                logger.info(f"Reached requested maximum of {max_results} comments")
-                all_comments = all_comments[:max_results]  # Trim to exact count
-                break
-                
-            # Get the next page token
-            next_page_token = metadata.get("nextPageToken")
-            
-            # If no more pages, we're done
-            if not next_page_token:
-                logger.info("No more comment pages available")
-                break
-                
-            # Sleep briefly to avoid API rate limits
-            time.sleep(0.5)
-            
-            # Increment page counter
-            page_num += 1
-        
-        # Complete the progress bar
-        progress_bar.progress(1.0)
-        status_text.text(f"Successfully retrieved {len(all_comments)} comments!")
-        
-        logger.info(f"Successfully retrieved a total of {len(all_comments)} comments")
-        return all_comments
-        
-    except Exception as e:
-        logger.error(f"Error in fetch_all_comments: {str(e)}")
-        progress_bar.progress(1.0)
-        status_text.text(f"Error: {str(e)}")
-        raise ValueError(f"Error fetching comments: {str(e)}")
 
 def extract_video_statistics(video_id):
     """
@@ -268,15 +180,31 @@ def extract_video_statistics(video_id):
         try:
             date_obj = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
             formatted_date = date_obj.strftime("%Y-%m-%d")
-        except ValueError:
+        except (ValueError, AttributeError):
             formatted_date = date_str
+        
+        # Safely parse numeric values
+        try:
+            view_count = int(statistics.get("viewCount", 0))
+        except (ValueError, TypeError):
+            view_count = 0
+            
+        try:
+            like_count = int(statistics.get("likeCount", 0))
+        except (ValueError, TypeError):
+            like_count = 0
+            
+        try:
+            comment_count = int(statistics.get("commentCount", 0))
+        except (ValueError, TypeError):
+            comment_count = 0
         
         return {
             "title": snippet.get("title", "Unknown Title"),
             "channel": snippet.get("channelTitle", "Unknown Channel"),
-            "views": int(statistics.get("viewCount", 0)),
-            "likes": int(statistics.get("likeCount", 0)),   
-            "comments": int(statistics.get("commentCount", 0)),
+            "views": view_count,
+            "likes": like_count,   
+            "comments": comment_count,
             "published_at": formatted_date,
             "description": snippet.get("description", "No description available")
         }
