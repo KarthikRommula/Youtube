@@ -1,0 +1,37 @@
+version = 0.1
+
+[default]
+  [default.deploy]
+    [default.deploy.parameters]
+    stack_name = "youtube-analytics-api"
+    s3_bucket = "youtube-dashboard-karthik"
+    s3_prefix = "youtube-analytics-api"
+    region = "ap-south-1"
+    confirm_changeset = true
+    capabilities = "CAPABILITY_IAM"
+    parameter_overrides = "Environment=\"production\""
+    resolve_s3 = true
+    disable_rollback = true
+    image_repositories = []
+
+[staging]
+  [staging.deploy]
+    [staging.deploy.parameters]
+    stack_name = "youtube-analytics-api-staging"
+    s3_bucket = "youtube-dashboard-karthik"
+    s3_prefix = "youtube-analytics-api-staging"
+    region = "ap-south-1"
+    confirm_changeset = true
+    capabilities = "CAPABILITY_IAM"
+    parameter_overrides = "YouTubeApiKey='YOUR_YOUTUBE_API_KEY' Environment='staging'"
+
+[dev]
+  [dev.deploy]
+    [dev.deploy.parameters]
+    stack_name = "youtube-analytics-api-dev"
+    s3_bucket = "youtube-dashboard-karthik"
+    s3_prefix = "youtube-analytics-api-dev"
+    region = "ap-south-1"
+    confirm_changeset = true
+    capabilities = "CAPABILITY_IAM"
+    parameter_overrides = "YouTubeApiKey='YOUR_YOUTUBE_API_KEY' Environment='development'"

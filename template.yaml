@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: YouTube Analytics API using FastAPI
+
+Parameters:
+  YouTubeApiKey:
+    Type: String
+    Description: YouTube Data API Key
+    NoEcho: true
+
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - production
+      - development
+      - staging
+    Description: Environment name
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.12
+    Environment:
+      Variables:
+        YOUTUBE_API_KEY: !Ref YouTubeApiKey
+        ENVIRONMENT: !Ref Environment
+
+Resources:
+  YouTubeAnalyticsApi:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambda      # Point to lambda directory
+      Handler: api.handler  # Make sure this points to your FastAPI handler
+      Runtime: python3.12
+      MemorySize: 1024
+      Timeout: 300
+      Events:
+        ApiEventRoot:
+          Type: Api
+          Properties:
+            Path: / 
+            Method: GET
+        ApiEventAny:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+      Environment:
+        Variables:
+          PYTHONPATH: /var/task/
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Sid: LambdaLogging
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
+
+  ApiGatewayRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt YouTubeAnalyticsApi.Arn
+
+Outputs:
+  ApiUrl:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+
+  FunctionArn:
+    Description: "Lambda Function ARN"
+    Value: !GetAtt YouTubeAnalyticsApi.Arn
